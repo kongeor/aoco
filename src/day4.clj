@@ -20,10 +20,6 @@
   (take 5 data)
   )
 
-(def d (first data))
-
-(print d)
-
 (-->e wso
   ([" "] wso)
   ([\space] wso)
@@ -35,10 +31,13 @@
 
 (def digits (into #{} "1234567890"))
 (defn cr [c1 c2]
-  (map char (range (int c1) (inc (int c2)))))
+  (map char (range (int c1) (inc (int c2)))))               ;; TODO correction of samples
 (def alpha (into #{} (concat (cr \a \z) (cr \A \Z))))
 (def hex (into #{} (concat (cr \a \f) (cr \0 \9))))
 (def color (into #{} (concat hex [\#])))
+
+(def allchars (into #{} (concat (cr \a \z) (cr \A \Z) (cr \0 \9) [\#])))
+
 
 (def-->e digito [x]
   ([_] [x]
@@ -70,8 +69,18 @@
   ([[?d . ?ds]] (coloro ?d) (colorso ?ds))
   ([[?d]] (coloro ?d)))
 
+(def-->e allcharo [x]
+  ([_] [x]
+   (!dcg
+     (project [x]
+       (== (contains? allchars x) true)))))
+
+(def-->e allcharso [x]
+  ([[?d . ?ds]] (allcharo ?d) (allcharso ?ds))
+  ([[?d]] (allcharo ?d)))
+
 #_(run 1 [q]
-  (colorso q (vec "123") []))
+  (allcharso q (vec "#123z") []))
 
 
 (def-->e sepo [s]
@@ -89,13 +98,17 @@
 
 (def-->e sizeo [s]
   ([[:cm]] [\c] [\m])
-  ([[:in]] [\i] [\n]))
+  ([[:in]] [\i] [\n])
+  ([[:na]] []))
+
+#_(run 1 [q]
+  (macroexpand (sizeo q (vec "cm") [])))
 
 (def-->e expro [e]
-  ([[:ecl ?x]] [\e] [\c] [\l] [\:] (wordo ?x))
-  ([[:pid ?x]] [\p] [\i] [\d] [\:] (colorso ?x))
+  ([[:ecl ?x]] [\e] [\c] [\l] [\:] (allcharso ?x))
+  ([[:pid ?x]] [\p] [\i] [\d] [\:] (allcharso ?x))
   ([[:eyr ?x]] [\e] [\y] [\r] [\:] (numo ?x))
-  ([[:hcl ?x]] [\h] [\c] [\l] [\:] (colorso ?x))
+  ([[:hcl ?x]] [\h] [\c] [\l] [\:] (allcharso ?x))
   ([[:byr ?x]] [\b] [\y] [\r] [\:] (numo ?x))
   ([[:iyr ?x]] [\i] [\y] [\r] [\:] (numo ?x))
   ([[:cid ?x]] [\c] [\i] [\d] [\:] (numo ?x))
@@ -129,9 +142,9 @@
   #_(nth data 2))
 
 (comment
-  (nth data 8)
+  #_(nth data 8)
   #_(parse-line (nth data 8))
-  #_(map parse-line (take 2 (drop 7 data))))
+  (def parsed-data (mapv first (map parse-line data))))
 
 #_(run* [s]
   (typeo s '[eyr] []))
@@ -144,3 +157,63 @@
 (comment
   d
   #_(day2b))
+
+(defn valido [p]
+  (membero [:ecl (lvar)] p)
+  (membero [:pid (lvar)] p)
+  (membero [:eyr (lvar)] p)
+  (membero [:hcl (lvar)] p)
+  (membero [:iyr (lvar)] p)
+  (membero [:hgt (lvar) (lvar)] p))
+
+(defn valid? [passport]
+  (let [p (-> passport second)]
+    (= 1
+      (count
+        (run* [q]
+          ;; TODO why doesn't work with valido?
+          (membero [:byr (lvar)] p)
+          (membero [:ecl (lvar)] p)
+          (membero [:pid (lvar)] p)
+          (membero [:eyr (lvar)] p)
+          (membero [:hcl (lvar)] p)
+          (membero [:iyr (lvar)] p)
+          (membero [:hgt (lvar) (lvar)] p)
+          )))))
+
+  (comment
+  #_(map (fn [p] {:data p :valid? (valid? p)}) parsed-data)
+  (count (filter identity (map valid? parsed-data))))
+
+#_(valid? (parse-line "hcl:#cfa07d eyr:2025 pid:166559648 iyr:2011 ecl:brn hgt:59in"))
+
+
+(comment
+  (let [input "ecl:gry pid:860033327 eyr:2020 hcl:#fffffd\nbyr:1937 iyr:2017 cid:147 hgt:183cm\n\niyr:2013 ecl:amb cid:350 eyr:2023 pid:028048884\nhcl:#cfa07d byr:1929\n\nhcl:#ae17e1 iyr:2013\neyr:2024\necl:brn pid:760753108 byr:1931\nhgt:179cm\n\nhcl:#cfa07d eyr:2025 pid:166559648\niyr:2011 ecl:brn hgt:59in"
+        data (map #(clojure.string/replace % "\n" " ") (clojure.string/split input #"\n\n"))
+        parsed-data (mapv #(-> % first) (mapv parse-line data))
+        wat (second (parsed-data 3))]
+    #_wat
+    (valid? wat)
+    #_(run* [q]
+      (valido wat))
+    #_(run* [q]
+      (valido (-> (nth parsed-data 3) second)))
+    #_(map valid? parsed-data)))
+
+(comment
+  (let [p '([:hcl (\# \c \f \a \0 \7 \d)]
+            [:eyr (\2 \0 \2 \5)]
+            [:pid (\1 \6 \6 \5 \5 \9 \6 \4 \8)]
+            [:iyr (\2 \0 \1 \1)]
+            [:ecl (\b \r \n)]
+            (:hgt (\5 \9) :in))]
+    (run* [q]
+      (membero [:byr (lvar)] p)
+      (membero [:ecl (lvar)] p)
+      (membero [:pid (lvar)] p)
+      (membero [:eyr (lvar)] p)
+      (membero [:hcl (lvar)] p)
+      (membero [:iyr (lvar)] p)
+      (membero [:hgt (lvar) (lvar)] p)
+      )))
